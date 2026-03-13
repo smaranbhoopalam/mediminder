@@ -23,16 +23,27 @@ export default function RegisterPage() {
       try {
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
-        
+
         const session = data?.session;
         if (!session) {
           router.push('/login');
           return;
         }
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profile && !error) {
+          router.push('/dashboard');
+          return;
+        }
         setUserId(session.user.id);
-        setForm(f => ({ 
-          ...f, 
-          user_email: f.user_email || session.user.email || '' 
+        setForm(f => ({
+          ...f,
+          user_email: f.user_email || session.user.email || ''
         }));
       } catch (err) {
         console.error('Error fetching session:', err);
@@ -70,10 +81,10 @@ export default function RegisterPage() {
         age: ageInt,
         health_issues: healthIssuesArr,
         user_email: form.user_email,
-        user_phone: form.user_phone,
+        user_phone: form.user_phone || null,
         guardian_name: form.guardian_name,
         guardian_email: form.guardian_email,
-        guardian_phone: form.guardian_phone,
+        guardian_phone: form.guardian_phone || null,
         guardian_social: form.guardian_social,
         medication_opted_in: form.medication_opted_in,
       });
@@ -136,7 +147,7 @@ export default function RegisterPage() {
                 onChange={e => updateForm('user_email', e.target.value)} />
             </div>
             <div className="form-group">
-              <label className="form-label">Phone Number</label>
+              <label className="form-label">Phone Number(Optional)</label>
               <input className="form-input" type="tel" placeholder="+1 234 567 890" value={form.user_phone}
                 onChange={e => updateForm('user_phone', e.target.value)} />
             </div>
