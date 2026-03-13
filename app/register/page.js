@@ -20,10 +20,24 @@ export default function RegisterPage() {
 
   useEffect(() => {
     async function getUser() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/login'); return; }
-      setUserId(session.user.id);
-      setForm(f => ({ ...f, user_email: session.user.email || '' }));
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        const session = data?.session;
+        if (!session) {
+          router.push('/login');
+          return;
+        }
+        setUserId(session.user.id);
+        setForm(f => ({ 
+          ...f, 
+          user_email: f.user_email || session.user.email || '' 
+        }));
+      } catch (err) {
+        console.error('Error fetching session:', err);
+        router.push('/login');
+      }
     }
     getUser();
   }, [router]);
@@ -33,32 +47,47 @@ export default function RegisterPage() {
   }
 
   async function handleSubmit() {
-    setLoading(true);
-    const healthIssuesArr = form.health_issues
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean);
-
-    const { error } = await supabase.from('profiles').upsert({
-      id: userId,
-      full_name: form.full_name,
-      age: parseInt(form.age),
-      health_issues: healthIssuesArr,
-      user_email: form.user_email,
-      user_phone: form.user_phone,
-      guardian_name: form.guardian_name,
-      guardian_email: form.guardian_email,
-      guardian_phone: form.guardian_phone,
-      guardian_social: form.guardian_social,
-      medication_opted_in: form.medication_opted_in,
-    });
-
-    if (error) {
-      alert('Error saving profile: ' + error.message);
-    } else {
-      router.push('/dashboard');
+    if (!userId) {
+      alert('You must be logged in to complete your profile.');
+      router.push('/login');
+      return;
     }
-    setLoading(false);
+
+    setLoading(true);
+    try {
+      const healthIssuesArr = form.health_issues
+        ? form.health_issues.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+
+      const ageInt = parseInt(form.age);
+      if (isNaN(ageInt)) {
+        throw new Error('Please enter a valid age.');
+      }
+
+      const { error } = await supabase.from('profiles').upsert({
+        id: userId,
+        full_name: form.full_name,
+        age: ageInt,
+        health_issues: healthIssuesArr,
+        user_email: form.user_email,
+        user_phone: form.user_phone,
+        guardian_name: form.guardian_name,
+        guardian_email: form.guardian_email,
+        guardian_phone: form.guardian_phone,
+        guardian_social: form.guardian_social,
+        medication_opted_in: form.medication_opted_in,
+      });
+
+      if (error) throw error;
+
+      alert("Profile setup complete!");
+      router.push('/dashboard');
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      alert('Error saving profile: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
   const totalSteps = 3;
@@ -181,7 +210,7 @@ export default function RegisterPage() {
             <div style={{ display: 'flex', gap: 12 }}>
               <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => setStep(2)}>← Back</button>
               <button className="btn btn-primary" style={{ flex: 2 }} onClick={handleSubmit} disabled={loading || !form.guardian_email}>
-                {loading ? <span className="spinner" style={{width:20,height:20}}></span> : '✨ Complete Setup'}
+                {loading ? <span className="spinner" style={{ width: 20, height: 20 }}></span> : '✨ Complete Setup'}
               </button>
             </div>
           </div>
